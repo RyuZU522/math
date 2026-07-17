@@ -5,7 +5,6 @@ import type { ConceptParam, MathConcept } from '../data/mockData.ts'
 import { renderInlineLatex } from '../utils/renderInlineLatex.ts'
 import { useFavorites } from '../composables/useFavorites'
 import FormulaCard from './FormulaCard.vue'
-import DerivationPanel from './DerivationPanel.vue'
 import InteractiveCanvas from './InteractiveCanvas.vue'
 import '../style/concept-detail.css'
 
@@ -32,6 +31,8 @@ const DETAIL_TABS: Array<{ key: DetailTabKey; label: string }> = [
 ]
 
 const activeDetailTab = ref<DetailTabKey>('description')
+const isDerivationExpanded = ref(false)
+const activeDerivationStep = ref(0)
 const favoriteFeedback = ref('')
 let favoriteFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -39,6 +40,8 @@ watch(
   () => props.concept.id,
   () => {
     activeDetailTab.value = 'description'
+    isDerivationExpanded.value = false
+    activeDerivationStep.value = 0
     favoriteFeedback.value = ''
   },
 )
@@ -154,10 +157,80 @@ const handleToggleFavorite = async () => {
         </div>
       </div>
 
-      <DerivationPanel
+      <div
         v-if="concept.derivationSteps?.length"
-        :steps="concept.derivationSteps"
-      />
+        class="mt-6 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/40"
+      >
+        <button
+          type="button"
+          class="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-slate-800/50"
+          @click="isDerivationExpanded = !isDerivationExpanded"
+        >
+          <div class="flex items-center gap-2">
+            <svg
+              class="h-4 w-4 transition-transform duration-200"
+              :class="{ 'rotate-90': isDerivationExpanded }"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+            <span>展开推导过程</span>
+          </div>
+          <span class="text-xs text-slate-500">{{ concept.derivationSteps.length }} 步</span>
+        </button>
+
+        <div v-show="isDerivationExpanded" class="border-t border-slate-700/60 p-4">
+          <div class="space-y-3">
+            <div
+              v-for="(stepLatex, stepIndex) in concept.derivationSteps"
+              :key="stepIndex"
+              class="relative cursor-pointer pl-6 transition-all duration-300"
+              :class="[
+                stepIndex === activeDerivationStep
+                  ? 'opacity-100'
+                  : 'opacity-40 hover:opacity-70',
+              ]"
+              @click="activeDerivationStep = stepIndex"
+            >
+              <div class="absolute top-0 bottom-0 left-0 flex flex-col items-center">
+                <div
+                  class="mt-2 h-2 w-2 rounded-full transition-colors duration-300"
+                  :class="
+                    stepIndex === activeDerivationStep
+                      ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.6)]'
+                      : 'bg-slate-600'
+                  "
+                />
+                <div
+                  v-if="stepIndex !== concept.derivationSteps.length - 1"
+                  class="my-1 w-px flex-1 transition-colors duration-300"
+                  :class="
+                    stepIndex < activeDerivationStep ? 'bg-sky-400/50' : 'bg-slate-700'
+                  "
+                />
+              </div>
+
+              <div
+                class="rounded-lg border p-3 transition-colors duration-300"
+                :class="
+                  stepIndex === activeDerivationStep
+                    ? 'border-sky-500/20 bg-sky-900/20'
+                    : 'border-transparent bg-transparent'
+                "
+              >
+                <FormulaCard :formula="stepLatex" compact />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section v-if="concept.hasInteractive" class="concept-detail__panel">

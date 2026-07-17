@@ -1,33 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth, waitForAuthReady } from '../composables/useAuth'
+import { ajaxRoutes } from './ajax'
+import { baseRoutes } from './base'
 
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    {
-      path: '/',
-      name: 'dashboard',
-      component: () => import('../views/DashboardView.vue'),
-    },
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('../views/LoginView.vue'),
-      meta: { guestOnly: true },
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('../views/RegisterView.vue'),
-      meta: { guestOnly: true },
-    },
-    {
-      path: '/favorites',
-      name: 'favorites',
-      component: () => import('../views/FavoritesView.vue'),
-      meta: { requiresAuth: true },
-    },
-  ],
+  routes: [...baseRoutes, ...ajaxRoutes],
   scrollBehavior: () => ({ top: 0 }),
 })
 
