@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useFavorites } from '../composables/useFavorites'
 import '../style/auth.css'
 
 const route = useRoute()
@@ -13,6 +14,7 @@ const {
   isAuthSubmitting,
   clearAuthError,
 } = useAuth()
+const { reloadFavorites } = useFavorites()
 
 const emailInput = ref('')
 const passwordInput = ref('')
@@ -35,6 +37,7 @@ const handleSubmit = async () => {
       return
     }
 
+    await reloadFavorites()
     const redirectPath =
       typeof route.query.redirect === 'string' ? route.query.redirect : '/favorites'
     await router.replace(redirectPath)

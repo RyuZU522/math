@@ -16,7 +16,10 @@ const applyCurrentUser = (user: AuthUser | null) => {
   const previousUserId = currentUser.value?.id ?? null
   const nextUserId = user?.id ?? null
   // 同用户仅更新引用时跳过，避免触发收藏等依赖重复加载
-  if (previousUserId === nextUserId && (previousUserId === null || currentUser.value?.email === user?.email)) {
+  if (
+    previousUserId === nextUserId &&
+    (previousUserId === null || currentUser.value?.email === user?.email)
+  ) {
     return
   }
   currentUser.value = user
@@ -34,10 +37,12 @@ const ensureAuthSubscription = () => {
       }
     }
 
-    // 单例订阅，生命周期与应用一致
+    // 必须把状态更新推迟到鉴权回调之外，否则后续 Supabase 请求会卡在 auth lock
     authService.onAuthStateChange((user) => {
-      applyCurrentUser(user)
-      markReady()
+      window.setTimeout(() => {
+        applyCurrentUser(user)
+        markReady()
+      }, 0)
     })
 
     void authService.getSession().then((user) => {

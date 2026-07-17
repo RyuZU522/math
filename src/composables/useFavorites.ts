@@ -13,39 +13,49 @@ const bindFavoritesWatcher = () => {
 
   const { currentUser } = useAuth()
 
-  // 按用户 ID 监听，避免登录时同用户对象被赋两次导致重复请求
+  // 按用户 ID 监听；请求推迟到下一宏任务，避开 Supabase onAuthStateChange 鉴权锁
   watch(
     () => currentUser.value?.id ?? null,
-    async (userId, _previousUserId, onCleanup) => {
+    (userId, _previousUserId, onCleanup) => {
       let cancelled = false
+      const timeoutId = window.setTimeout(() => {
+        void (async () => {
+          if (!userId) {
+            if (!cancelled) {
+              favoriteConceptIds.value = []
+              isFavoritesLoading.value = false
+              favoritesErrorMessage.value = ''
+            }
+            return
+          }
+
+          if (!cancelled) {
+            isFavoritesLoading.value = true
+            favoritesErrorMessage.value = ''
+          }
+
+          try {
+            const conceptIds = await favoritesService.list(userId)
+            if (!cancelled) {
+              favoriteConceptIds.value = conceptIds
+            }
+          } catch (error) {
+            if (!cancelled) {
+              favoritesErrorMessage.value =
+                error instanceof Error ? error.message : '加载收藏失败'
+            }
+          } finally {
+            if (!cancelled) {
+              isFavoritesLoading.value = false
+            }
+          }
+        })()
+      }, 0)
+
       onCleanup(() => {
         cancelled = true
+        window.clearTimeout(timeoutId)
       })
-
-      if (!userId) {
-        favoriteConceptIds.value = []
-        isFavoritesLoading.value = false
-        favoritesErrorMessage.value = ''
-        return
-      }
-
-      isFavoritesLoading.value = true
-      favoritesErrorMessage.value = ''
-      try {
-        const conceptIds = await favoritesService.list(userId)
-        if (!cancelled) {
-          favoriteConceptIds.value = conceptIds
-        }
-      } catch (error) {
-        if (!cancelled) {
-          favoritesErrorMessage.value =
-            error instanceof Error ? error.message : '加载收藏失败'
-        }
-      } finally {
-        if (!cancelled) {
-          isFavoritesLoading.value = false
-        }
-      }
     },
     { immediate: true },
   )
