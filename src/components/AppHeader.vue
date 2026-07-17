@@ -49,14 +49,14 @@ const handleSignOut = async () => {
         <RouterLink
           class="app-header__link"
           :class="{ 'app-header__link--active': route.name === 'login' }"
-          :to="{ name: 'login' }"
+          :to="{ name: 'login', query: { redirect: '/favorites' } }"
         >
           登录
         </RouterLink>
         <RouterLink
           class="app-header__link"
           :class="{ 'app-header__link--active': route.name === 'register' }"
-          :to="{ name: 'register' }"
+          :to="{ name: 'register', query: { redirect: '/favorites' } }"
         >
           注册
         </RouterLink>

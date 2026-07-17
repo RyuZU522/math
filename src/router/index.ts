@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { authService } from '../services/auth'
+import { useAuth, waitForAuthReady } from '../composables/useAuth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -32,17 +32,21 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  const currentUser = await authService.getSession()
+  // 使用内存中的登录态，避免登录后导航再 await getSession 撞上 Supabase 鉴权锁
+  await waitForAuthReady()
+  const { currentUser } = useAuth()
 
-  if (to.meta.requiresAuth && !currentUser) {
+  if (to.meta.requiresAuth && !currentUser.value) {
     return {
       name: 'login',
       query: { redirect: to.fullPath },
     }
   }
 
-  if (to.meta.guestOnly && currentUser) {
-    return { name: 'dashboard' }
+  if (to.meta.guestOnly && currentUser.value) {
+    const redirectPath =
+      typeof to.query.redirect === 'string' ? to.query.redirect : '/favorites'
+    return redirectPath
   }
 
   return true

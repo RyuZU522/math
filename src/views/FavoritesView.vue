@@ -1,16 +1,29 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { mockConcepts } from '../data/mockData'
 import { useFavorites } from '../composables/useFavorites'
 import '../style/auth.css'
 
-const { favoriteConceptIds, isFavoritesLoading } = useFavorites()
+const {
+  favoriteConceptIds,
+  isFavoritesLoading,
+  favoritesErrorMessage,
+  isLoggedIn,
+  reloadFavorites,
+} = useFavorites()
 
 const favoriteConcepts = computed(() =>
   favoriteConceptIds.value
     .map((conceptId) => mockConcepts.find((conceptItem) => conceptItem.id === conceptId))
     .filter((conceptItem): conceptItem is NonNullable<typeof conceptItem> => Boolean(conceptItem)),
 )
+
+onMounted(() => {
+  // 登录后进入时若 watch 尚未拉完则不重复请求；已结束则强制刷新一次
+  if (isLoggedIn.value && !isFavoritesLoading.value) {
+    void reloadFavorites()
+  }
+})
 </script>
 
 <template>
@@ -21,6 +34,13 @@ const favoriteConcepts = computed(() =>
     </p>
 
     <div v-if="isFavoritesLoading" class="favorites-page__empty">正在加载收藏…</div>
+
+    <div v-else-if="favoritesErrorMessage" class="favorites-page__empty">
+      {{ favoritesErrorMessage }}
+      <div style="margin-top: 0.75rem">
+        <button type="button" class="app-header__button" @click="reloadFavorites">重试</button>
+      </div>
+    </div>
 
     <div v-else-if="favoriteConcepts.length === 0" class="favorites-page__empty">
       还没有收藏。去概念库点击标题旁的星标即可添加。

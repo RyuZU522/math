@@ -13,23 +13,38 @@ const bindFavoritesWatcher = () => {
 
   const { currentUser } = useAuth()
 
+  // 按用户 ID 监听，避免登录时同用户对象被赋两次导致重复请求
   watch(
-    currentUser,
-    async (user) => {
-      if (!user) {
+    () => currentUser.value?.id ?? null,
+    async (userId, _previousUserId, onCleanup) => {
+      let cancelled = false
+      onCleanup(() => {
+        cancelled = true
+      })
+
+      if (!userId) {
         favoriteConceptIds.value = []
+        isFavoritesLoading.value = false
+        favoritesErrorMessage.value = ''
         return
       }
 
       isFavoritesLoading.value = true
       favoritesErrorMessage.value = ''
       try {
-        favoriteConceptIds.value = await favoritesService.list(user.id)
+        const conceptIds = await favoritesService.list(userId)
+        if (!cancelled) {
+          favoriteConceptIds.value = conceptIds
+        }
       } catch (error) {
-        favoritesErrorMessage.value =
-          error instanceof Error ? error.message : '加载收藏失败'
+        if (!cancelled) {
+          favoritesErrorMessage.value =
+            error instanceof Error ? error.message : '加载收藏失败'
+        }
       } finally {
-        isFavoritesLoading.value = false
+        if (!cancelled) {
+          isFavoritesLoading.value = false
+        }
       }
     },
     { immediate: true },
@@ -48,6 +63,7 @@ export const useFavorites = () => {
   const reloadFavorites = async () => {
     if (!currentUser.value) {
       favoriteConceptIds.value = []
+      isFavoritesLoading.value = false
       return
     }
 

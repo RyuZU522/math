@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { authService, type AuthUser } from '../services/auth'
 import type { SignUpResult } from '../services/auth/types'
 import { mapAuthErrorMessage } from '../services/auth/mapAuthError'
@@ -10,20 +10,58 @@ const authInfoMessage = ref('')
 const isAuthSubmitting = ref(false)
 
 let authInitialized = false
+let authReadyPromise: Promise<void> | null = null
+
+const applyCurrentUser = (user: AuthUser | null) => {
+  const previousUserId = currentUser.value?.id ?? null
+  const nextUserId = user?.id ?? null
+  // 同用户仅更新引用时跳过，避免触发收藏等依赖重复加载
+  if (previousUserId === nextUserId && (previousUserId === null || currentUser.value?.email === user?.email)) {
+    return
+  }
+  currentUser.value = user
+}
 
 const ensureAuthSubscription = () => {
   if (authInitialized) return
   authInitialized = true
 
-  // 单例订阅，生命周期与应用一致
-  authService.onAuthStateChange((user) => {
-    currentUser.value = user
-    isAuthReady.value = true
-  })
+  authReadyPromise = new Promise<void>((resolve) => {
+    const markReady = () => {
+      if (!isAuthReady.value) {
+        isAuthReady.value = true
+        resolve()
+      }
+    }
 
-  void authService.getSession().then((user) => {
-    currentUser.value = user
-    isAuthReady.value = true
+    // 单例订阅，生命周期与应用一致
+    authService.onAuthStateChange((user) => {
+      applyCurrentUser(user)
+      markReady()
+    })
+
+    void authService.getSession().then((user) => {
+      applyCurrentUser(user)
+      markReady()
+    })
+  })
+}
+
+/** 等待首次鉴权就绪（供路由守卫使用，避免每次导航都打 getSession） */
+export const waitForAuthReady = async () => {
+  ensureAuthSubscription()
+  if (isAuthReady.value) return
+  if (authReadyPromise) {
+    await authReadyPromise
+    return
+  }
+  await new Promise<void>((resolve) => {
+    const stopWatch = watch(isAuthReady, (ready) => {
+      if (ready) {
+        stopWatch()
+        resolve()
+      }
+    })
   })
 }
 
@@ -48,7 +86,7 @@ export const useAuth = () => {
         authInfoMessage.value =
           '注册成功。请先到邮箱点击确认链接，再回来登录。若本地开发可到 Supabase → Authentication → Providers → Email 关闭 Confirm email。'
       } else {
-        currentUser.value = signUpResult.user
+        applyCurrentUser(signUpResult.user)
       }
       return signUpResult
     } catch (error) {
@@ -65,7 +103,7 @@ export const useAuth = () => {
     authInfoMessage.value = ''
     try {
       const authUser = await authService.signIn(email, password)
-      currentUser.value = authUser
+      applyCurrentUser(authUser)
       return authUser
     } catch (error) {
       authErrorMessage.value = mapAuthErrorMessage(error, '登录失败')
@@ -79,7 +117,7 @@ export const useAuth = () => {
     authErrorMessage.value = ''
     authInfoMessage.value = ''
     await authService.signOut()
-    currentUser.value = null
+    applyCurrentUser(null)
   }
 
   return {
